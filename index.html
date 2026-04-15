@@ -65,7 +65,7 @@
                     <i data-lucide="verified" class="w-12 h-12 text-[#000080]"></i>
                 </div>
                 <h2 class="text-4xl font-extrabold text-slate-900 tracking-tight">Eldor SOP</h2>
-                <p class="text-slate-500 font-medium">Yeni GitHub yapısıyla oturum açın.</p>
+                <p class="text-slate-500 font-medium">Lütfen admin bilgileriyle oturum açın.</p>
             </div>
             <form id="loginForm" class="space-y-6">
                 <div class="space-y-2">
@@ -161,6 +161,7 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+            <!-- Editör Sol Taraf -->
             <div class="lg:col-span-8 space-y-6">
                 <div class="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-sm">
                     <div class="flex border-b border-slate-100 mb-8 gap-10">
@@ -214,6 +215,7 @@
                 </div>
             </div>
 
+            <!-- Sağ Panel -->
             <div class="lg:col-span-4 space-y-8">
                 <div class="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col min-h-[350px]">
                     <div class="flex items-center justify-between mb-6">
@@ -250,7 +252,6 @@
         // --- ONEDRIVE AYARLARI ---
         const CLIENT_ID = "1fec7a90-0661-485d-9877-ec7f5c73b39a"; 
 
-        // Eldorsop kullanıcısına göre otomatik yönlendirme tespiti
         const currentUri = window.location.href.split('?')[0].split('#')[0];
 
         const msalConfig = {
@@ -262,6 +263,8 @@
         };
 
         const msalInstance = new msal.PublicClientApplication(msalConfig);
+        let msalInitialized = false;
+
         const SCOPES = ["Files.ReadWrite.All"];
 
         // --- GLOBAL STATE ---
@@ -323,6 +326,7 @@
 
         const ctx = els.mainCanvas.getContext('2d');
 
+        // Giriş Mantığı
         els.loginForm.onsubmit = (e) => {
             e.preventDefault();
             if (document.getElementById('usernameInput').value === ADMIN_U && document.getElementById('passwordInput').value === ADMIN_P) {
@@ -332,10 +336,23 @@
             }
         };
 
-        els.tabBtns.forEach((btn, idx) => btn.onclick = () => {
-            window.activeIdx = idx;
-            els.tabBtns.forEach((b, i) => b.classList.toggle('active', i === idx));
-            renderAll();
+        // MSAL Başlatma
+        async function initializeMsal() {
+            if (!msalInitialized) {
+                await msalInstance.initialize();
+                msalInitialized = true;
+            }
+        }
+
+        // Tab ve Resim Yönetimi
+        els.tabBtns.forEach((btn, idx) => {
+            if (btn) {
+                btn.onclick = () => {
+                    window.activeIdx = idx;
+                    els.tabBtns.forEach((b, i) => b && b.classList.toggle('active', i === idx));
+                    renderAll();
+                };
+            }
         });
 
         els.fileInput.onchange = (e) => {
@@ -443,10 +460,20 @@
         }
 
         async function getAccessToken() {
+            await initializeMsal();
             const accounts = msalInstance.getAllAccounts();
-            if (accounts.length === 0) { const res = await msalInstance.loginPopup({ scopes: SCOPES }); return res.accessToken; }
-            try { const res = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] }); return res.accessToken; } 
-            catch { const res = await msalInstance.acquireTokenPopup({ scopes: SCOPES }); return res.accessToken; }
+            if (accounts.length === 0) { 
+                const res = await msalInstance.loginPopup({ scopes: SCOPES }); 
+                return res.accessToken; 
+            }
+            try { 
+                const res = await msalInstance.acquireTokenSilent({ scopes: SCOPES, account: accounts[0] }); 
+                return res.accessToken; 
+            } 
+            catch { 
+                const res = await msalInstance.acquireTokenPopup({ scopes: SCOPES }); 
+                return res.accessToken; 
+            }
         }
 
         async function createPdfBlob() {
@@ -491,12 +518,12 @@
 
             tctx.fillStyle='#f1f5f9'; tctx.fillRect(margin, cy, cw-(margin*2), 50);
             tctx.fillStyle='#000080'; tctx.font='bold 28px Arial'; tctx.fillText('TALİMAT ADIMLARI', margin+20, cy+36); cy += 80;
-            let stepI = 0;
+            let stepIdx = 0;
             window.points.forEach(p => {
                 if (p.type === 'red' || p.isManual) {
-                    stepI++; const lines = pdf.splitTextToSize(p.description || "Açıklama belirtilmedi.", 210);
+                    stepIdx++; const lines = pdf.splitTextToSize(p.description || "Açıklama belirtilmedi.", 210);
                     tctx.fillStyle='#000080'; tctx.beginPath(); tctx.arc(margin+20, cy+15, 18, 0, Math.PI*2); tctx.fill();
-                    tctx.fillStyle='white'; tctx.font='bold 18px Arial'; tctx.textAlign='center'; tctx.fillText(stepI, margin+20, cy+21);
+                    tctx.fillStyle='white'; tctx.font='bold 18px Arial'; tctx.textAlign='center'; tctx.fillText(stepIdx, margin+20, cy+21);
                     tctx.fillStyle='#1e293b'; tctx.font='20px Arial'; tctx.textAlign='left';
                     lines.forEach((l, i) => tctx.fillText(l, margin+60, cy+22+(i*30))); cy += Math.max(60, lines.length*30)+20;
                 }
@@ -515,30 +542,47 @@
                 const name = `SOP_${(els.sopTitleInput.value || 'Doc').replace(/\s+/g, '_')}_${Date.now()}.pdf`;
                 const url = `https://graph.microsoft.com/v1.0/me/drive/root:/${folder}/${name}:/content`;
 
-                const res = await fetch(url, { method: 'PUT', headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/pdf' }, body: blob });
+                const res = await fetch(url, { 
+                    method: 'PUT', 
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/pdf' }, 
+                    body: blob 
+                });
+                
                 const data = await res.json();
                 els.loading.classList.add('hidden');
+                
                 if (res.ok) {
                     els.modalMessage.innerText = `Döküman OneDrive '${folder}' klasörüne yüklendi.`;
                     els.qrSection.classList.remove('hidden'); els.qrContainer.innerHTML = '';
                     new QRCode(els.qrContainer, { text: data.webUrl, width: 160, height: 160, colorDark: "#000080" });
                     els.qrTitleText.innerText = els.sopTitleInput.value || "SOP";
                     els.customModal.classList.remove('hidden'); els.customModal.classList.add('flex');
-                } else { throw new Error(data.error?.message); }
-            } catch (err) { els.loading.classList.add('hidden'); alert("Hata: " + err.message); }
+                } else { 
+                    throw new Error(data.error?.message || "Yükleme sırasında hata oluştu."); 
+                }
+            } catch (err) { 
+                els.loading.classList.add('hidden'); 
+                alert("OneDrive Hatası: " + err.message); 
+            }
         };
 
         els.exportPdfBtn.onclick = async () => {
             els.loadingText.innerText = "PDF Hazırlanıyor..."; els.loading.classList.remove('hidden');
-            const blob = await createPdfBlob();
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = `SOP_${Date.now()}.pdf`; a.click();
-            els.loading.classList.add('hidden');
+            try {
+                const blob = await createPdfBlob();
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a'); a.href = url; a.download = `SOP_${Date.now()}.pdf`; a.click();
+            } catch(e) {
+                alert("PDF oluşturma hatası.");
+            } finally {
+                els.loading.classList.add('hidden');
+            }
         };
 
         els.resetBtn.onclick = () => { if(confirm("Tüm veriler silinsin mi?")) { window.points = []; window.images = [null, null]; window.warnings = []; window.arrows = []; renderAll(); renderWarnings(); } };
         els.addManualBtn.onclick = () => { window.points.push({ px: null, py: null, description: '', type: 'red', isSilent: false, imgIdx: -1, isManual: true }); renderAll(); };
         els.addWarningBtn.onclick = () => { window.warnings.push({ text: '' }); renderWarnings(); };
+        
         function renderWarnings() {
             els.warningsContainer.innerHTML = '';
             window.warnings.forEach((w, i) => {
