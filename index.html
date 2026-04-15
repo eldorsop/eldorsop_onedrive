@@ -65,7 +65,7 @@
                     <i data-lucide="verified" class="w-12 h-12 text-[#000080]"></i>
                 </div>
                 <h2 class="text-4xl font-extrabold text-slate-900 tracking-tight">Eldor SOP</h2>
-                <p class="text-slate-500 font-medium">Lütfen admin bilgileriyle oturum açın.</p>
+                <p class="text-slate-500 font-medium">Yeni GitHub yapısıyla oturum açın.</p>
             </div>
             <form id="loginForm" class="space-y-6">
                 <div class="space-y-2">
@@ -84,7 +84,7 @@
     <!-- Yükleme Ekranı -->
     <div id="loading" class="loading-overlay hidden">
         <div class="w-16 h-16 border-[6px] border-[#000080] border-t-transparent rounded-full animate-spin mb-6"></div>
-        <p class="font-black text-[#000080] text-xl animate-pulse" id="loadingText">OneDrive'a Bağlanılıyor...</p>
+        <p class="font-black text-[#000080] text-xl animate-pulse" id="loadingText">OneDrive İşlemi Yapılıyor...</p>
     </div>
 
     <!-- Kırpma Modalı -->
@@ -161,7 +161,6 @@
         </div>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
-            <!-- Editör Sol Taraf -->
             <div class="lg:col-span-8 space-y-6">
                 <div class="bg-white rounded-[2.5rem] border border-slate-200 p-8 shadow-sm">
                     <div class="flex border-b border-slate-100 mb-8 gap-10">
@@ -174,7 +173,6 @@
                             <i data-lucide="plus" class="w-10 h-10 text-blue-500"></i>
                         </div>
                         <p class="font-black text-slate-600 text-2xl">SOP Görselini Buraya Yükle</p>
-                        <p class="text-slate-400 font-medium mt-2">Cihazınızdan bir fotoğraf seçmek için tıklayın</p>
                         <input type="file" id="fileInput" class="hidden" accept="image/*">
                     </div>
 
@@ -216,9 +214,7 @@
                 </div>
             </div>
 
-            <!-- Sağ Panel -->
             <div class="lg:col-span-4 space-y-8">
-                <!-- Talimatlar -->
                 <div class="bg-white p-8 rounded-[2.5rem] border border-slate-200 shadow-sm flex flex-col min-h-[350px]">
                     <div class="flex items-center justify-between mb-6">
                         <h2 class="font-black text-[#000080] text-sm uppercase tracking-widest flex items-center gap-3">
@@ -237,7 +233,6 @@
                     </div>
                 </div>
 
-                <!-- Kritik Uyarılar -->
                 <div class="bg-white p-8 rounded-[2.5rem] border-2 border-red-50 shadow-sm">
                     <h2 class="font-black text-red-600 text-sm uppercase tracking-widest mb-6 flex items-center gap-3">
                         <i data-lucide="alert-octagon" class="w-5 h-5"></i> KRİTİK UYARILAR
@@ -255,18 +250,21 @@
         // --- ONEDRIVE AYARLARI ---
         const CLIENT_ID = "1fec7a90-0661-485d-9877-ec7f5c73b39a"; 
 
+        // Eldorsop kullanıcısına göre otomatik yönlendirme tespiti
+        const currentUri = window.location.href.split('?')[0].split('#')[0];
+
         const msalConfig = {
             auth: {
                 clientId: CLIENT_ID,
                 authority: "https://login.microsoftonline.com/common",
-                redirectUri: window.location.origin
+                redirectUri: currentUri 
             }
         };
 
         const msalInstance = new msal.PublicClientApplication(msalConfig);
         const SCOPES = ["Files.ReadWrite.All"];
 
-        // --- GLOBAL DURUM ---
+        // --- GLOBAL STATE ---
         let cropper;
         window.activeIdx = 0; 
         window.images = [null, null]; 
@@ -325,7 +323,6 @@
 
         const ctx = els.mainCanvas.getContext('2d');
 
-        // Giriş Mantığı
         els.loginForm.onsubmit = (e) => {
             e.preventDefault();
             if (document.getElementById('usernameInput').value === ADMIN_U && document.getElementById('passwordInput').value === ADMIN_P) {
@@ -335,7 +332,6 @@
             }
         };
 
-        // Tab ve Resim Yönetimi
         els.tabBtns.forEach((btn, idx) => btn.onclick = () => {
             window.activeIdx = idx;
             els.tabBtns.forEach((b, i) => b.classList.toggle('active', i === idx));
@@ -360,7 +356,6 @@
             }; r.readAsDataURL(f);
         };
 
-        // Kırpma İşlemleri
         function openCropModal() {
             const currentImg = window.images[window.activeIdx];
             if (!currentImg) return;
@@ -377,7 +372,6 @@
             img.src = canvas.toDataURL('image/jpeg', 0.95);
         }
 
-        // Çizim Mantığı
         function drawArrowHead(ctx, fx, fy, tx, ty, color) {
             const hl = 28; const ang = Math.atan2(ty - fy, tx - fx);
             ctx.beginPath(); ctx.strokeStyle = color; ctx.lineWidth = 7; ctx.lineCap = 'round';
@@ -448,7 +442,6 @@
             els.emptyTableState.classList.toggle('hidden', ic > 0); lucide.createIcons();
         }
 
-        // --- MICROSOFT GRAPH API & PDF GENERATION ---
         async function getAccessToken() {
             const accounts = msalInstance.getAllAccounts();
             if (accounts.length === 0) { const res = await msalInstance.loginPopup({ scopes: SCOPES }); return res.accessToken; }
@@ -466,7 +459,6 @@
             let cy = margin;
 
             tctx.fillStyle = 'white'; tctx.fillRect(0, 0, cw, ch);
-            // Header
             tctx.fillStyle = '#f8fafc'; tctx.fillRect(margin, margin-20, cw-(margin*2), 120);
             if (window.companyLogo) { const r = window.companyLogo.width/window.companyLogo.height; tctx.drawImage(window.companyLogo, margin+10, margin-10, 80*r, 80); }
             tctx.fillStyle = '#000080'; tctx.font = 'bold 38px Arial'; tctx.fillText((els.sopTitleInput.value || 'SOP DOKUMANI').toUpperCase(), margin+220, margin+20);
@@ -497,15 +489,14 @@
                 drawImg(active, (cw-850)/2, cy, 850, h); cy += h+60;
             }
 
-            // Tablo
             tctx.fillStyle='#f1f5f9'; tctx.fillRect(margin, cy, cw-(margin*2), 50);
             tctx.fillStyle='#000080'; tctx.font='bold 28px Arial'; tctx.fillText('TALİMAT ADIMLARI', margin+20, cy+36); cy += 80;
-            let stepIdx = 0;
+            let stepI = 0;
             window.points.forEach(p => {
                 if (p.type === 'red' || p.isManual) {
-                    stepIdx++; const lines = pdf.splitTextToSize(p.description || "Açıklama belirtilmedi.", 210);
+                    stepI++; const lines = pdf.splitTextToSize(p.description || "Açıklama belirtilmedi.", 210);
                     tctx.fillStyle='#000080'; tctx.beginPath(); tctx.arc(margin+20, cy+15, 18, 0, Math.PI*2); tctx.fill();
-                    tctx.fillStyle='white'; tctx.font='bold 18px Arial'; tctx.textAlign='center'; tctx.fillText(stepIdx, margin+20, cy+21);
+                    tctx.fillStyle='white'; tctx.font='bold 18px Arial'; tctx.textAlign='center'; tctx.fillText(stepI, margin+20, cy+21);
                     tctx.fillStyle='#1e293b'; tctx.font='20px Arial'; tctx.textAlign='left';
                     lines.forEach((l, i) => tctx.fillText(l, margin+60, cy+22+(i*30))); cy += Math.max(60, lines.length*30)+20;
                 }
@@ -528,7 +519,7 @@
                 const data = await res.json();
                 els.loading.classList.add('hidden');
                 if (res.ok) {
-                    els.modalMessage.innerText = `Döküman OneDrive üzerindeki '${folder}' klasörüne başarıyla gönderildi.`;
+                    els.modalMessage.innerText = `Döküman OneDrive '${folder}' klasörüne yüklendi.`;
                     els.qrSection.classList.remove('hidden'); els.qrContainer.innerHTML = '';
                     new QRCode(els.qrContainer, { text: data.webUrl, width: 160, height: 160, colorDark: "#000080" });
                     els.qrTitleText.innerText = els.sopTitleInput.value || "SOP";
@@ -545,7 +536,6 @@
             els.loading.classList.add('hidden');
         };
 
-        // UI Kontrolleri
         els.resetBtn.onclick = () => { if(confirm("Tüm veriler silinsin mi?")) { window.points = []; window.images = [null, null]; window.warnings = []; window.arrows = []; renderAll(); renderWarnings(); } };
         els.addManualBtn.onclick = () => { window.points.push({ px: null, py: null, description: '', type: 'red', isSilent: false, imgIdx: -1, isManual: true }); renderAll(); };
         els.addWarningBtn.onclick = () => { window.warnings.push({ text: '' }); renderWarnings(); };
